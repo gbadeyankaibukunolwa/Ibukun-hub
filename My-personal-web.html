@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ibukunolwa's Hub</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #fafafa;
+      margin: 0;
+      padding: 0;
+    }
+    #app {
+      max-width: 700px;
+      margin: auto;
+      padding: 20px;
+      background: #fff;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .profile {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .profile img {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #ccc;
+    }
+    input, textarea {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #3897f0;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .post {
+      border-top: 1px solid #eee;
+      padding: 15px 0;
+    }
+    .post img, .post video {
+      max-width: 100%;
+      margin-top: 10px;
+      border-radius: 10px;
+    }
+    .actions {
+      margin-top: 10px;
+    }
+    .actions button {
+      background: none;
+      color: #555;
+      border: none;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+    .file-link {
+      display: block;
+      margin-top: 10px;
+      color: #3897f0;
+      text-decoration: underline;
+    }
+    .share-popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      z-index: 999;
+    }
+    .share-popup button {
+      display: block;
+      width: 100%;
+      margin: 5px 0;
+      background: #3897f0;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>Ibukunolwa's Hub</h1>
+
+    <div class="profile">
+      <input type="file" accept="image/*" onchange="uploadProfile(event)" />
+      <img id="profile-pic" src="" alt="Profile Picture" />
+    </div>
+
+    <textarea id="post-text" placeholder="What's on your mind?"></textarea>
+    <input type="file" id="media-upload" multiple />
+    <button onclick="submitPost()">Post</button>
+
+    <div id="feed"></div>
+  </div>
+
+  <script>
+    let posts = JSON.parse(localStorage.getItem("posts")) || [];
+
+    function uploadProfile(event) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById("profile-pic").src = e.target.result;
+        localStorage.setItem("profilePic", e.target.result);
+      };
+      reader.readAsDataURL(event.target.files[0]);
+    }
+
+    function submitPost() {
+      const text = document.getElementById("post-text").value;
+      const files = document.getElementById("media-upload").files;
+      const media = [];
+
+      for (let file of files) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          media.push({ type: file.type, data: e.target.result, name: file.name });
+          if (media.length === files.length) {
+            savePost(text, media);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      if (files.length === 0) savePost(text, media);
+    }
+
+    function savePost(text, media) {
+      const post = {
+        text,
+        media,
+        likes: 0,
+        comments: []
+      };
+      posts.unshift(post);
+      localStorage.setItem("posts", JSON.stringify(posts));
+      document.getElementById("post-text").value = "";
+      document.getElementById("media-upload").value = "";
+      renderPosts();
+    }
+
+    function renderPosts() {
+      const feed = document.getElementById("feed");
+      feed.innerHTML = "";
+
+      posts.forEach((post, index) => {
+        const div = document.createElement("div");
+        div.className = "post";
+        div.innerHTML = `<p>${post.text}</p>`;
+
+        post.media.forEach(m => {
+          if (m.type.startsWith("image")) {
+            div.innerHTML += `<img src="${m.data}" alt="Image" />`;
+          } else if (m.type.startsWith("video")) {
+            div.innerHTML += `<video controls src="${m.data}"></video>`;
+          } else {
+            div.innerHTML += `<a class="file-link" href="${m.data}" download="${m.name}">${m.name}</a>`;
+          }
+        });
+
+        div.innerHTML += `
+          <div class="actions">
+            <button onclick="likePost(${index})">❤️ ${post.likes}</button>
+            <button onclick="commentPost(${index})">💬 Comment</button>
+            <button onclick="sharePost('${encodeURIComponent(post.text)}')">🔗 Share</button>
+          </div>
+          <p><strong>Comments:</strong> ${post.comments.join(", ")}</p>
+        `;
+        feed.appendChild(div);
+      });
+    }
+
+    function likePost(index) {
+      posts[index].likes++;
+      localStorage.setItem("posts", JSON.stringify(posts));
+      renderPosts();
+    }
+
+    function commentPost(index) {
+      const comment = prompt("Write your comment:");
+      if (comment) {
+        posts[index].comments.push(comment);
+        localStorage.setItem("posts", JSON.stringify(posts));
+        renderPosts();
+      }
+    }
+
+    function sharePost(text) {
+      const decodedText = decodeURIComponent(text);
+      const shareMenu = document.createElement("div");
+      shareMenu.className = "share-popup";
+      shareMenu.innerHTML = `
+        <h3>Share this post</h3>
+        <button onclick="window.open('https://www.facebook.com/sharer/sharer.php?u=${text}', '_blank')">Facebook</button>
+        <button onclick="window.open('https://twitter.com/intent/tweet?text=${text}', '_blank')">Twitter</button>
+        <button onclick="window.open('https://www.instagram.com/', '_blank')">Instagram</button>
+        <button onclick="window.open('https://www.tiktok.com/upload', '_blank')">TikTok</button>
+        <button onclick="this.parentElement.remove()">Close</button>
+      `;
+      document.body.appendChild(shareMenu);
+    }
+
+    window.onload = function() {
+      const pic = localStorage.getItem("profilePic");
+      if (pic) document.getElementById("profile-pic").src = pic;
+      renderPosts();
+    };
+  </script>
+</body>
+</html>
